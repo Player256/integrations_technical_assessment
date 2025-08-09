@@ -68,15 +68,6 @@ async def oauth2callback_hubspot(request: Request):
         get_value_redis(f"hubspot_state:{org_id}:{user_id}"),
     )
 
-    # if not saved_state:
-    #     raise HTTPException(status_code=400, detail="State does not match")
-
-    # saved_state_str = (
-    #     saved_state.decode("utf-8") if isinstance(saved_state, bytes) else saved_state
-    # )
-    # if original_state != json.loads(saved_state_str).get("state"):
-    #     raise HTTPException(status_code=400, detail="State does not match")
-
     async with httpx.AsyncClient() as client:
         response, _ = await asyncio.gather(
             client.post(
@@ -126,42 +117,55 @@ async def get_hubspot_credentials(user_id, org_id):
 async def create_integration_item_metadata_object(
     response_json, item_type: str
 ) -> IntegrationItem:
-    props = response_json.get("properties", {})
+    props_str = response_json.get("properties", "{}")
+    props = json.loads(props_str) if isinstance(props_str, str) else props_str
 
     if item_type.lower() == "contact":
-        name = f"{props.get('firstname', '')} {props.get('lastname', '')}".strip()
+
+        first_name = props.get("firstname", "") or ""
+        last_name = props.get("lastname", "") or ""
+
+        name = f"{first_name} {last_name}".strip()
+
+        if not name:
+            email = props.get("email", "")
+            name = email if email else "(no name)"
     else:
-        name = props.get("name", "")
+        name = props.get("name", "") or ""
+
+    creation_time = props.get("createdate")
+    last_modified_time = props.get("lastmodifieddate")
 
     integration_item = IntegrationItem(
         id=response_json.get("id"),
         type=item_type,
         name=name if name else "(no name)",
-        creation_time=props.get("createdate"),
-        last_modified_time=props.get("hs_lastmodifieddate"),
+        creation_time=creation_time,
+        last_modified_time=last_modified_time,
         url=None,
     )
 
     return integration_item
 
 
-import httpx
+async def get_items_hubspot(credentials) -> list[dict]:
 
+    if isinstance(credentials, str):
+        credentials = json.loads(credentials)
 
-async def get_items_hubspot(credentials) -> list[IntegrationItem]:
-    credentials = (
-        json.loads(credentials) if isinstance(credentials, str) else credentials
-    )
+        if isinstance(credentials, str):
+            credentials = json.loads(credentials)
+
     headers = {
-        "Authorization": f"Bearer {credentials.get('access_token')}",
+        "Authorization": f'Bearer {credentials.get("access_token")}',
         "Content-Type": "application/json",
     }
 
-    items: list[IntegrationItem] = []
+    items = []
     url = "https://api.hubapi.com/crm/v3/objects/contacts"
     params = {"limit": 10}
 
-    async with httpx.AsyncClient() as client: 
+    async with httpx.AsyncClient() as client:
         resp = await client.get(url, headers=headers, params=params)
 
         if resp.status_code != 200:
@@ -169,6 +173,17 @@ async def get_items_hubspot(credentials) -> list[IntegrationItem]:
 
         for obj in resp.json().get("results", []):
             item = await create_integration_item_metadata_object(obj, "Contact")
-            items.append(item)
+            items.append(
+                {
+                    "id": item.id,
+                    "type": item.type,
+                    "name": item.name,
+                    "creation_time": item.creation_time,
+                    "last_modified_time": item.last_modified_time,
+                    "url": item.url,
+                    "parent_id": getattr(item, "parent_id", None),
+                    "parent_path_or_name": getattr(item, "parent_path_or_name", None),
+                }
+            )
 
     return items
