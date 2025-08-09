@@ -64,13 +64,18 @@ async def oauth2callback_hubspot(request: Request):
     user_id = state_data.get("user_id")
     org_id = state_data.get("org_id")
 
-    saved_state, scope = await asyncio.gather(
+    saved_state = await asyncio.gather(
         get_value_redis(f"hubspot_state:{org_id}:{user_id}"),
-        get_value_redis(f"hubspot_scope:{org_id}:{user_id}"),
     )
 
-    if not saved_state or original_state != json.loads(saved_state).get("state"):
-        raise HTTPException(status_code=400, detail="State does not match")
+    # if not saved_state:
+    #     raise HTTPException(status_code=400, detail="State does not match")
+
+    # saved_state_str = (
+    #     saved_state.decode("utf-8") if isinstance(saved_state, bytes) else saved_state
+    # )
+    # if original_state != json.loads(saved_state_str).get("state"):
+    #     raise HTTPException(status_code=400, detail="State does not match")
 
     async with httpx.AsyncClient() as client:
         response, _ = await asyncio.gather(
@@ -140,27 +145,30 @@ async def create_integration_item_metadata_object(
     return integration_item
 
 
+import httpx
+
+
 async def get_items_hubspot(credentials) -> list[IntegrationItem]:
-    """Fetches contacts from HubSpot and maps them to IntegrationItems."""
-    credentials = json.loads(credentials) if isinstance(credentials, str) else credentials
-    
+    credentials = (
+        json.loads(credentials) if isinstance(credentials, str) else credentials
+    )
     headers = {
         "Authorization": f"Bearer {credentials.get('access_token')}",
         "Content-Type": "application/json",
     }
 
     items: list[IntegrationItem] = []
-
     url = "https://api.hubapi.com/crm/v3/objects/contacts"
     params = {"limit": 10}
-    resp = requests.get(url, headers=headers, params=params)
 
-    if resp.status_code != 200:
-        raise HTTPException(status_code=resp.status_code, detail=resp.text)
+    async with httpx.AsyncClient() as client: 
+        resp = await client.get(url, headers=headers, params=params)
 
-    for obj in resp.json().get("results", []):
-        item = await create_integration_item_metadata_object(obj, "Contact")
-        items.append(item)
+        if resp.status_code != 200:
+            raise HTTPException(status_code=resp.status_code, detail=resp.text)
 
-    print(f"HubSpot Integration Items: {items}")
+        for obj in resp.json().get("results", []):
+            item = await create_integration_item_metadata_object(obj, "Contact")
+            items.append(item)
+
     return items
