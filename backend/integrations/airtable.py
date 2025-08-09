@@ -21,8 +21,8 @@ load_dotenv()
 
 # CLIENT_ID = 'XXX'
 # CLIENT_SECRET = 'XXX'
-CLIENT_ID = os.environ('AIRTABLE_CLIENT_ID')
-CLIENT_SECRET = os.environ("AIRTABLE_CLIENT_SECRET")
+CLIENT_ID = os.environ['AIRTABLE_CLIENT_ID']
+CLIENT_SECRET = os.environ["AIRTABLE_CLIENT_SECRET"]
 REDIRECT_URI = 'http://localhost:8000/integrations/airtable/oauth2callback'
 authorization_url = f'https://airtable.com/oauth2/v1/authorize?client_id={CLIENT_ID}&response_type=code&owner=user&redirect_uri=http%3A%2F%2Flocalhost%3A8000%2Fintegrations%2Fairtable%2Foauth2callback'
 

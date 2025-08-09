@@ -11,10 +11,11 @@ from redis_client import add_key_value_redis, get_value_redis, delete_key_redis
 
 load_dotenv()
 
-CLIENT_ID = os.environ("HUBSPOT_CLIENT_ID")
-CLIENT_SECRET = os.environ("HUBSPOT_CLIENT_SECRET")
-REDIRECT_URI = "localhost:8000/integrations/hubspot/oauth2callback"
-authorization_url = f"https://app-na2.hubspot.com/oauth/authorize?client_id={CLIENT_ID}&redirect_uri={REDIRECT_URI}"
+CLIENT_ID = os.environ["HUBSPOT_CLIENT_ID"]
+CLIENT_SECRET = os.environ["HUBSPOT_CLIENT_SECRET"]
+REDIRECT_URI = "http://localhost:8000/integrations/hubspot/oauth2callback"
+scope = "oauth"
+authorization_url = f"https://app-na2.hubspot.com/oauth/authorize?client_id={CLIENT_ID}&redirect_uri={REDIRECT_URI}&scope={scope}"
 
 encoded_client_id_secret = base64.b64encode(
     f"{CLIENT_ID}:{CLIENT_SECRET}".encode()
@@ -29,8 +30,6 @@ async def authorize_hubspot(user_id, org_id):
     }
 
     encoded_state = json.dumps(state_data)
-
-    scope = "oauth"
 
     await asyncio.gather(
         add_key_value_redis(
@@ -62,7 +61,7 @@ async def oauth2callback_hubspot(request: Request):
         raise HTTPException(status_code=400, detail="State does not match")
 
     async with httpx.AsyncClient() as client:
-        response, _, _ = await asyncio.gather(
+        response, _ = await asyncio.gather(
             client.post(
                 "https://api.hubspot.com/oauth/v1/token",
                 data={
@@ -70,11 +69,11 @@ async def oauth2callback_hubspot(request: Request):
                     "code": code,
                     "redirect_uri": REDIRECT_URI,
                     "client_id": CLIENT_ID,
-                    "scope": scope,
+                    "client_secret": CLIENT_SECRET,
                 },
                 headers={
                     "Authorization": f"Basic {encoded_client_id_secret}",
-                    "Content-Type": "application/json",
+                    "Content-Type": "application/x-www-form-urlencoded",
                 },
             ),
             delete_key_redis(f"hubspot_state:{org_id}:{user_id}"),
@@ -93,7 +92,7 @@ async def oauth2callback_hubspot(request: Request):
             </script>
             </html> 
         """
-        
+
         return HTMLResponse(content=close_windown_script)
 
 
