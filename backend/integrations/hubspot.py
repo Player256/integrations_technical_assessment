@@ -142,6 +142,8 @@ async def create_integration_item_metadata_object(
 
 async def get_items_hubspot(credentials) -> list[IntegrationItem]:
     """Fetches contacts from HubSpot and maps them to IntegrationItems."""
+    credentials = json.loads(credentials) if isinstance(credentials, str) else credentials
+    
     headers = {
         "Authorization": f"Bearer {credentials.get('access_token')}",
         "Content-Type": "application/json",

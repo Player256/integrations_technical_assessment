@@ -73,7 +73,8 @@ async def oauth2callback_hubspot_integration(request: Request):
 async def get_hubspot_credentials_integration(user_id: str = Form(...), org_id: str = Form(...)):
     return await get_hubspot_credentials(user_id, org_id)
 
-@app.post('/integrations/hubspot/get_hubspot_items')
-async def load_slack_data_integration(credentials: str = Form(...)):
-    credentials = json.loads(credentials)
+@app.post("/integrations/hubspot/load")
+async def load_slack_data_integration(request: Request):
+    body = await request.json()  
+    credentials = body.get("credentials")
     return await get_items_hubspot(credentials)
