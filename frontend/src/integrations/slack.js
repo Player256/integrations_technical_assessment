@@ -44,11 +44,11 @@ export const HubspotIntegration = ({user,org,integrationParams,setIntegrationPar
             const formData = new FormData();
             formData.append('user_id',user);
             formData.append('org_id',org);
-             const response = await axios.post(
-                'http://localhost:8000/integrations/hubspot/authorize',
+            const response = await axios.post(
+                'http://localhost:8000/integrations/hubspot/credentials',
                 formData
             )
-            const credentials = response?.data;
+            const credentials = response.data;
 
             if(credentials){
                 setIsConnecting(false);
@@ -67,8 +67,8 @@ export const HubspotIntegration = ({user,org,integrationParams,setIntegrationPar
     }
 
     useEffect(() => {
-            setIsConnected(integrationParams?.credentials ? true : false)
-        }, []);
+        setIsConnected(integrationParams?.credentials ? true : false)
+    }, [integrationParams?.credentials]);
 
      return (
         <>
